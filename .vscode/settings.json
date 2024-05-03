@@ -1,0 +1,17 @@
+{
+    "Lua.diagnostics.globals": [
+        "Proto",
+        "ProtoField",
+        "ftypes",
+        "base",
+        "DissectorTable",
+        "wtap",
+        "Field",
+        "Address",
+        "TextWindow",
+        "Listener",
+        "retap_packets",
+        "MENU_TOOLS_UNSORTED",
+        "register_menu"
+    ]
+}
