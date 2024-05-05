@@ -16,6 +16,15 @@
 
 # Open Items
 
+## Report Uptime and Unknown (0x30)
+### there are round decimal numbers lurking in the payload...
+- unknown value of a4 83 = 33700 decimal, oddly round
+- unparsed payload 1c 25 = 9500
+- unparsed payload 3c af = 44860
+- 0x1293 = 4755
+- 0x124e = 4686 ?
+
+
 ## Forwards (0xd5) of subtype  0xC0 - Observations:
 - Are very similar, for chunks of time, across device IDs
 - Broadcast to ID 0xFFFFFFFF and max FF:FF:FF:FF:FF:FF
