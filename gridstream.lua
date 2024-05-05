@@ -169,7 +169,7 @@ end
 --
 -- STUB
 -- ----------------------------------------------------------------------------
-local function gs_subsubtype_2921_dissector(buffer, pinfo, subtree, start)
+local function gs_subtype_2921_dissector(buffer, pinfo, subtree, start)
 	subtree:add(pf_dest_device_id1,  buffer(start,4))
 	subtree:add(pf_src_device_id1,   buffer(start+4,4))
 	subtree:add(pf_pkt_count,   	buffer(start+8,1))
@@ -184,7 +184,7 @@ end
 -- STUB
 --
 -- ----------------------------------------------------------------------------
-local function gs_subsubtype_22_dissector(buffer, pinfo, subtree, start)
+local function gs_subtype_22_dissector(buffer, pinfo, subtree, start)
 	local cursor = start
 
 	subtree:add(pf_dest_device_id1,	buffer(cursor,4))
@@ -211,7 +211,7 @@ end
 --  payload [len-4] == 0x7e in every packet in the Oncor dataset.
 --
 -- ----------------------------------------------------------------------------
-local function gs_subsubtype_c0_dissector(buffer, pinfo, subtree, start)
+local function gs_subtype_c0_dissector(buffer, pinfo, subtree, start)
 	local cursor = start
 	
 	subtree:add(pf_dest_device_id1,   buffer(cursor,4))
@@ -271,31 +271,9 @@ end
 
 
 -- ----------------------------------------------------------------------------
--- Dissector for device header d2
--- ----------------------------------------------------------------------------
-local function gs_type_d2_dissector(buffer, pinfo, tree, start)
-
-	local length = buffer:len()
-	local cursor = start
-	if (length-cursor) <= 0 then return end
-
-	pinfo.cols.protocol = "gridstream.mesg"
-	local subtree = tree:add(gs_proto_info,buffer)
-
-	subtree:add(pf_info_length,		buffer(cursor,1))
-	cursor = cursor+1
-
-
-	-- Rest as raw payload
-	util_remainder_as_payload(buffer,subtree,cursor)
-end
-
-
-
--- ----------------------------------------------------------------------------
 -- DISSECT body of Epoch Uptime packages
 -- ----------------------------------------------------------------------------
-local function gs_subsubtype_epoch_uptime_dissector(buffer, pinfo, subtree, start)
+local function gs_subtype_epoch_uptime_dissector(buffer, pinfo, subtree, start)
 	local length = buffer:len()
 	if (length-start) <= 0 then return end
 	
@@ -318,6 +296,64 @@ local function gs_subsubtype_epoch_uptime_dissector(buffer, pinfo, subtree, star
 
 	gs_payload_with_crc_dissector(buffer,subtree,start+35) -- BUG, was raw 35
 end
+
+-- ----------------------------------------------------------------------------
+-- DISSECTOR - Info broadcasts
+-- ----------------------------------------------------------------------------
+local function gs_subtype_30_dissector(buffer, pinfo, subtree, start)
+	local length = buffer:len()
+	if (length-start) <= 0 then return end
+
+	local cursor = start
+
+	-- Looks like a MAC address, so set in packet for WireShark Conversation analysis
+	pinfo.dst = Address.ether(buffer(cursor,6):raw())
+	subtree:add(pf_dest_wan_mac, buffer(cursor,6))
+	cursor = cursor + 6
+	
+	-- Looks like a MAC address, so set in packet for WireShark Conversation analysis
+	pinfo.src = Address.ether(buffer(cursor,6):raw())
+	subtree:add(pf_src_wan_mac, buffer(cursor,6))
+	cursor = cursor + 6
+
+	-- Appears to be sequence number
+	subtree:add(pf_pkt_count, 	buffer(cursor,1))
+	cursor = cursor + 1
+	
+	-- For the 0x30 type, For a specific source  device, 
+	-- this counts up continuously across the ONCOR sample set.
+	-- if subtype_val == 0x30 then
+	subtree:add(pf_uptime, buffer(cursor,4))
+	-- else
+	-- 	subtree:add(pf_unk2, 	buffer(cursor,4))
+	-- end
+	cursor = cursor + 4
+
+	subtree:add(pf_unk3, buffer(cursor,2))
+	cursor = cursor + 2
+
+	-- maybe a device ID?
+	subtree:add(pf_src_device_id2, buffer(cursor,4))
+	cursor = cursor + 4	
+
+	-- rest is unknown, dump into the raw payload
+	-- Rest as raw payload
+	util_remainder_as_payload(buffer,subtree,cursor)
+end
+
+
+-- ----------------------------------------------------------------------------
+-- MAP OF SUB-DISSECTORS
+-- ----------------------------------------------------------------------------
+local gs_subtype_dissector_map = {
+	[0x21] = gs_subtype_2921_dissector,
+	[0x22] = gs_subtype_22_dissector,
+	[0x29] = gs_subtype_2921_dissector,
+	[0x30] = gs_subtype_30_dissector,
+	[0x51] = gs_subtype_epoch_uptime_dissector,
+	[0x55] = gs_subtype_epoch_uptime_dissector,
+	[0xC0] = gs_subtype_c0_dissector
+}
 
 
 -- ----------------------------------------------------------------------------
@@ -345,63 +381,26 @@ local function gs_type_broadcast_dissector(buffer, pinfo, tree, start)
 	subtree:add(pf_subtype, buffer(cursor,1))
 	cursor = cursor + 1
 
-	if subtype_val == 0x30 then
-		
-		-- Looks like a MAC address, so set in packet for WireShark Conversation analysis
-		pinfo.dst = Address.ether(buffer(cursor,6):raw())
-		subtree:add(pf_dest_wan_mac, buffer(cursor,6))
-		cursor = cursor + 6
-		
-		-- Looks like a MAC address, so set in packet for WireShark Conversation analysis
-		pinfo.src = Address.ether(buffer(cursor,6):raw())
-		subtree:add(pf_src_wan_mac, buffer(cursor,6))
-		cursor = cursor + 6
-	
-		-- Appears to be sequence number
-		subtree:add(pf_pkt_count, 	buffer(cursor,1))
-		cursor = cursor + 1
-		
-		-- For the 0x30 type, For a specific source  device, 
-		-- this counts up continuously across the ONCOR sample set.
-		if subtype_val == 0x30 then
-			subtree:add(pf_uptime, buffer(cursor,4))
-		else
-			subtree:add(pf_unk2, 	buffer(cursor,4))
-		end
-		cursor = cursor + 4
-	
-		subtree:add(pf_unk3, buffer(cursor,2))
-		cursor = cursor + 2
-	
-		-- maybe a device ID?
-		subtree:add(pf_src_device_id2, buffer(cursor,4))
-		cursor = cursor + 4	
-	end
-	
-	-- This subtype MIGHT be the same as seen with FORWARDs
-	if (subtype_val == 0xc0 ) then
-		gs_subsubtype_c0_dissector(buffer,pinfo,subtree,cursor)
-		return
+	local subtype_dissector 	= gs_subtype_dissector_map[subtype_val]
+
+	-- exit if no match
+	if subtype_dissector ~= nil then
+		subtype_dissector(buffer, pinfo, subtree, start+3)
 	end
 
-	-- rest is unknown, dump into the raw payload
-	-- Rest as raw payload
-	util_remainder_as_payload(buffer,subtree,cursor)
+	-- -- @TODO: START MOVING THIS to gs_subtype_30_dissector
+	-- if subtype_val == 0x30 then
+	-- 	gs_subtype_30_dissector(buffer,pinfo,subtree,cursor)
+		
+	-- end
+	
+	-- -- This subtype MIGHT be the same as seen with FORWARDs
+	-- if (subtype_val == 0xc0 ) then
+	-- 	gs_subsubtype_c0_dissector(buffer,pinfo,subtree,cursor)
+	-- 	return
+	-- end
+
 end
-
-
--- ----------------------------------------------------------------------------
--- MAP OF SUB-DISSECTORS on FORWARDS
--- ----------------------------------------------------------------------------
-local gs_fwdsubtype_dissector_map = {
-	[0x21] = gs_subsubtype_2921_dissector,
-	[0x29] = gs_subsubtype_2921_dissector,
-	[0x51] = gs_subsubtype_epoch_uptime_dissector,
-	[0x55] = gs_subsubtype_epoch_uptime_dissector,
-	[0xC0] = gs_subsubtype_c0_dissector,
-	[0x22] = gs_subsubtype_22_dissector
-}
-
 
 -- ----------------------------------------------------------------------------
 -- DISSECTOR for "FOWARDED" packets with the header type of 0xD5
@@ -410,7 +409,6 @@ local gs_fwdsubtype_dissector_map = {
 -- above, and calls that dissector.
 --
 -- ----------------------------------------------------------------------------
-local fwdsubtype_field	= Field.new("gridstream.mesg.type")
 
 local function gs_type_forward_dissector(buffer, pinfo, tree, start)
 	local length = buffer:len()
@@ -425,10 +423,12 @@ local function gs_type_forward_dissector(buffer, pinfo, tree, start)
 	-- Length field
 	-- In the sample data, lengths don't roll-over into the unk field above.
 	subtree:add(pf_info_length,		buffer(start+1,1))
-    local subsubtree = subtree:add(pf_subtype,    	buffer(start+2,1))
 
-	local fwdsubtype_val 		= fwdsubtype_field()();
-	local fwdsubtype_dissector 	= gs_fwdsubtype_dissector_map[fwdsubtype_val]
+	-- maybe a subtype
+    local subsubtree  = subtree:add(pf_subtype,    	buffer(start+2,1))
+	local subtype_val = buffer(start+2,1):uint()
+
+	local fwdsubtype_dissector 	= gs_subtype_dissector_map[subtype_val]
 
 	-- exit if no match
 	if fwdsubtype_dissector ~= nil then
@@ -436,6 +436,29 @@ local function gs_type_forward_dissector(buffer, pinfo, tree, start)
 	end
 
 end
+
+
+-- ----------------------------------------------------------------------------
+-- Dissector for device header d2
+-- ----------------------------------------------------------------------------
+local function gs_type_d2_dissector(buffer, pinfo, tree, start)
+
+	local length = buffer:len()
+	local cursor = start
+	if (length-cursor) <= 0 then return end
+
+	pinfo.cols.protocol = "gridstream.mesg"
+	local subtree = tree:add(gs_proto_info,buffer)
+
+	subtree:add(pf_info_length,		buffer(cursor,1))
+	cursor = cursor+1
+
+
+	-- Rest as raw payload
+	util_remainder_as_payload(buffer,subtree,cursor)
+end
+
+
 
 --
 -- Setting it to
