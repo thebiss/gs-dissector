@@ -69,10 +69,10 @@ local pf_timing					= ProtoField.new("timing? (0.01s)",			"gridstream.mesg.timin
 
 local pf_unk1       			= ProtoField.new("flags?",					"gridstream.mesg.unk1",				ftypes.BYTES, 	nil, base.SPACE)
 local pf_unk2       			= ProtoField.new("unknown",					"gridstream.mesg.unk2",				ftypes.BYTES, 	nil, base.SPACE)
-local pf_unk3					= ProtoField.new("unknown",					"gridstream.mesg.unk3",				ftypes.BYTES,	nil, base.SPACE)
+local pf_unk3					= ProtoField.new("unknown",					"gridstream.mesg.unk3",				ftypes.UINT16,	nil, base.DEC)	-- use for decimalized words
 local pf_unk4					= ProtoField.new("unknown",					"gridstream.mesg.unk4",				ftypes.BYTES,	nil, base.SPACE)
-local pf_unk5					= ProtoField.new("unknown",					"gridstream.mesg.unk5",				ftypes.BYTES,	nil, base.SPACE)
-local pf_unk6					= ProtoField.new("unknown",					"gridstream.mesg.unk6",				ftypes.BYTES,	nil, base.SPACE)
+local pf_unk5					= ProtoField.new("unknown",					"gridstream.mesg.unk5",				ftypes.UINT16,	nil, base.DEC)
+local pf_unk6					= ProtoField.new("unknown",					"gridstream.mesg.unk6",				ftypes.UINT16,	nil, base.DEC)
 local pf_unk7					= ProtoField.new("unknown",					"gridstream.mesg.unk7",				ftypes.BYTES,	nil, base.SPACE)
 
 local pf_dest_wan_mac 			= ProtoField.new("dest device wan mac",	"gridstream.mesg.dest_device_wan_mac",	ftypes.BYTES,	nil, base.COLON)
@@ -133,7 +133,7 @@ local function util_remainder_as_payload(buffer,subtree,start)
 	local payloadLen 	= buffer:len() - cursor
 	if (payloadLen) <= 0 then return end
 
-	subtree:add(pf_payload_len,		payloadLen)
+	subtree:add(pf_payload_len,		payloadLen):set_generated()
 	subtree:add(pf_payload_raw,		buffer(cursor,payloadLen))
 end
 
@@ -151,7 +151,7 @@ local function gs_payload_with_crc_dissector(buffer,subtree,start)
 	if (payloadLen) <= 0 then return end
 
 	-- payload body
-	subtree:add(pf_payload_len,		payloadLen)
+	subtree:add(pf_payload_len,		payloadLen):set_generated()
 	local payloadtree = subtree:add(pf_payload_raw,		buffer(start,payloadLen))
 
 	-- footer fields
@@ -287,7 +287,7 @@ local function gs_subtype_epoch_uptime_dissector(buffer, pinfo, subtree, start)
 	subtree:add(pf_epoc_ts, 			buffer(start+9,4))
 	subtree:add(pf_unk2,        		buffer(start+13,4))
 	subtree:add(pf_uptime,      		buffer(start+17,4))
-	subtree:add(pf_unk4,				buffer(start+21,2))
+	subtree:add(pf_unk3,				buffer(start+21,2))
 	subtree:add(pf_unk5,				buffer(start+23,2))
 	subtree:add(pf_src_wan_mac,			buffer(start+25,6))
 	pinfo.src = Address.ether(buffer(start+25,6):raw())
@@ -322,11 +322,7 @@ local function gs_subtype_30_dissector(buffer, pinfo, subtree, start)
 	
 	-- For the 0x30 type, For a specific source  device, 
 	-- this counts up continuously across the ONCOR sample set.
-	-- if subtype_val == 0x30 then
 	subtree:add(pf_uptime, buffer(cursor,4))
-	-- else
-	-- 	subtree:add(pf_unk2, 	buffer(cursor,4))
-	-- end
 	cursor = cursor + 4
 
 	subtree:add(pf_unk3, buffer(cursor,2))
@@ -335,6 +331,15 @@ local function gs_subtype_30_dissector(buffer, pinfo, subtree, start)
 	-- maybe a device ID?
 	subtree:add(pf_src_device_id2, buffer(cursor,4))
 	cursor = cursor + 4	
+
+	-- Is there something in the tail of the payload, on messages of a certain length?
+	-- filteringon a device ID, like && (gridstream.mesg.src_device_id2 == f1:4c:75:61)
+	-- Value counts up, none higher than 16796
+	if(length == 41) then
+		subtree:add(pf_unk5, buffer(length-1-5,2)):append_text(" accumulates to 16796?")
+		subtree:add(pf_unk6, buffer(length-4,2)):append_text(" ?")
+	end
+
 
 	-- rest is unknown, dump into the raw payload
 	-- Rest as raw payload
@@ -387,19 +392,6 @@ local function gs_type_broadcast_dissector(buffer, pinfo, tree, start)
 	if subtype_dissector ~= nil then
 		subtype_dissector(buffer, pinfo, subtree, start+3)
 	end
-
-	-- -- @TODO: START MOVING THIS to gs_subtype_30_dissector
-	-- if subtype_val == 0x30 then
-	-- 	gs_subtype_30_dissector(buffer,pinfo,subtree,cursor)
-		
-	-- end
-	
-	-- -- This subtype MIGHT be the same as seen with FORWARDs
-	-- if (subtype_val == 0xc0 ) then
-	-- 	gs_subsubtype_c0_dissector(buffer,pinfo,subtree,cursor)
-	-- 	return
-	-- end
-
 end
 
 -- ----------------------------------------------------------------------------
@@ -496,7 +488,7 @@ function gs_proto.dissector(buffer,pinfo,tree)
 
     local subtree = tree:add(gs_proto,buffer)
 
-    subtree:add(pf_framestart, 	buffer(0,2))
+    subtree:add(pf_framestart, 	buffer(0,2))	-- 0x80FF or 0x00FF
     subtree:add(pf_flags,	    buffer(2,1))
     subtree:add(pf_type,	    buffer(3,1))
 
