@@ -11,7 +11,20 @@
 ### find patterns in hexdump, then pass through color
 `grep --color=always "50 CF 55 D9 E6 80" Oncor_Capture_01-07-2023_30hrs.txt.hd | sort | less -R`
 
+# We want / expect to see measurements like:
+- Voltage - around 240
+- Voltage phase angle - degrees
 
+- Current - up to 100/200/400
+- Current phase angle - degrees
+
+- Active power (W)
+- Apparent power (VA)
+- Reactive power (VAr)
+
+- Power Factor
+
+- Energy / time (e.g this hour, today): kWh
 
 
 # Open Items
