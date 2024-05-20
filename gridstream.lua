@@ -63,6 +63,7 @@ local pf_epoc_sec       		= ProtoField.new("date & time (epoch sec)",	"gridstrea
 local pf_epoc_ts				= ProtoField.new("date & time (parsed)",	"gridstream.mesg.timestamp", 		ftypes.ABSOLUTE_TIME, nil, 	base.UTC)
 
 local pf_uptime     			= ProtoField.new("uptime (0.1s)",			"gridstream.mesg.uptime",			ftypes.UINT32, 	nil, base.DEC)
+local pf_uptime_str				= ProtoField.new("uptime (hh:mm:ss)",		"gridstream.mesg.uptime_str",		ftypes.STRING)
 local pf_payload_raw    		= ProtoField.new("payload raw",  			"gridstream.mesg.payload",			ftypes.BYTES,	nil, base.SPACE)
 local pf_payload_len			= ProtoField.new("payload len",	 			"gridstream.mesg.payload_len",		ftypes.UINT16,	nil, base.DEC)
 local pf_timing					= ProtoField.new("timing? (0.01s)",			"gridstream.mesg.timing",			ftypes.UINT16,	nil, base.DEC)
@@ -95,6 +96,7 @@ gs_proto_info.fields ={
 	pf_epoc_sec,
 	pf_epoc_ts,
 	pf_uptime,
+	pf_uptime_str,
 	pf_payload_raw,
 	pf_payload_len,
 	pf_timing,
@@ -267,8 +269,23 @@ local function gs_subtype_c0_dissector(buffer, pinfo, subtree, start)
 
 end
 
+-- ----------------------------------------------------------------------------
+-- Convert an elapsed time, counting whole teths of seconds, to a readible string
+--#region
+-- ----------------------------------------------------------------------------
+local function util_elapsedtime_tostring(uptimeInDeciSeconds)
+	-- Parse the uptime
+	local part_tenths	= uptimeInDeciSeconds % 10	-- tenths
+	local rest 			= uptimeInDeciSeconds / 10 -- whole seconds
+	local part_sec 		= rest % 60 -- residual seconds
 
+	rest 				= rest / 60 -- whole minutes
+	local part_mins 	= rest % 60 -- residual minutes
+	local part_hrs 		= rest / 60	-- whole hours 
 
+	local timestr 		= string.format("%d:%.2d:%.2d.%d",part_hrs,part_mins,part_sec,part_tenths)
+	return timestr
+end
 
 -- ----------------------------------------------------------------------------
 -- DISSECT body of Epoch Uptime packages
@@ -286,7 +303,15 @@ local function gs_subtype_epoch_uptime_dissector(buffer, pinfo, subtree, start)
 	-- As timestamp
 	subtree:add(pf_epoc_ts, 			buffer(start+9,4))
 	subtree:add(pf_unk2,        		buffer(start+13,4))
-	subtree:add(pf_uptime,      		buffer(start+17,4))
+	
+	-- As uptime
+	local raw_uptime = buffer(start+17,4):uint()
+	subtree:add(pf_uptime,      		raw_uptime)
+
+	local uptime_str = util_elapsedtime_tostring(raw_uptime)
+	subtree:add(pf_uptime_str,			uptime_str):set_generated()
+
+
 	subtree:add(pf_unk3,				buffer(start+21,2))
 	subtree:add(pf_unk5,				buffer(start+23,2))
 	subtree:add(pf_src_wan_mac,			buffer(start+25,6))
@@ -322,8 +347,14 @@ local function gs_subtype_30_dissector(buffer, pinfo, subtree, start)
 	
 	-- For the 0x30 type, For a specific source  device, 
 	-- this counts up continuously across the ONCOR sample set.
-	subtree:add(pf_uptime, buffer(cursor,4))
+	local raw_uptime = buffer(cursor,4):uint()
+	subtree:add(pf_uptime, raw_uptime)
 	cursor = cursor + 4
+
+	-- reformat the time as a string
+	local uptime_str = util_elapsedtime_tostring(raw_uptime)
+	subtree:add(pf_uptime_str,			uptime_str):set_generated()	
+
 
 	subtree:add(pf_unk3, buffer(cursor,2))
 	cursor = cursor + 2
