@@ -476,16 +476,40 @@ local function gs_type_d2_dissector(buffer, pinfo, tree, start)
 	subtree:add(pf_info_length,		buffer(cursor,1))
 	cursor = cursor+1
 
+	local payloadStart = cursor
+
+	-- Guesses to help decode this
+	subtree:add(pf_unk1,	buffer(cursor,1))
+	cursor = cursor+1
+
+	subtree:add(pf_unk2,	buffer(cursor,1))
+	cursor = cursor+1
+
+	subtree:add(pf_unk3,	buffer(cursor,1))
+	cursor = cursor+1
+
+	subtree:add(pf_unk4,	buffer(cursor,2))
+	cursor = cursor+2
+
+	subtree:add(pf_unk5,	buffer(cursor,2))
+	cursor = cursor+2
 
 	-- Rest as raw payload
-	util_remainder_as_payload(buffer,subtree,cursor)
+	util_remainder_as_payload(buffer,subtree,payloadStart)
 end
 
 
+-- ----------------------------------------------------------------------------
+-- Dissector for type 0x81 or 0x85
+--
+--  These only appear in the CRC:BAD packets, and some of the fields are way off
+--  e.g. uptime counts that are 10x - 100x previous values, and out of sequence
+--
+-- ----------------------------------------------------------------------------
 local function gs_type_8185_dissector(buffer, pinfo, tree, start)
 	local length = buffer:len()
 	local cursor = start
-	if (length-cursor) <= 30 then return end
+	if (length-cursor) <= 0 then return end
 
 	pinfo.cols.protocol = "gridstream.mesg"
 	local subtree = tree:add(gs_proto_info,buffer)
@@ -498,6 +522,15 @@ local function gs_type_8185_dissector(buffer, pinfo, tree, start)
 
 	subtree:add(pf_dest_device_id1,	buffer(cursor,4))
 	cursor = cursor+4
+
+
+	subtree:add(pf_src_wan_mac,	buffer(cursor,6))
+	cursor = cursor+6
+
+	subtree:add(pf_src_device_id1,	buffer(cursor,4))
+	cursor = cursor+4
+
+
 
 end
 
