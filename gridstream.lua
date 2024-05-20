@@ -482,6 +482,25 @@ local function gs_type_d2_dissector(buffer, pinfo, tree, start)
 end
 
 
+local function gs_type_8185_dissector(buffer, pinfo, tree, start)
+	local length = buffer:len()
+	local cursor = start
+	if (length-cursor) <= 30 then return end
+
+	pinfo.cols.protocol = "gridstream.mesg"
+	local subtree = tree:add(gs_proto_info,buffer)
+
+	subtree:add(pf_unk1,	buffer(cursor,1))
+	cursor = cursor+1
+
+	subtree:add(pf_dest_wan_mac,	buffer(cursor,6))
+	cursor = cursor+6
+
+	subtree:add(pf_dest_device_id1,	buffer(cursor,4))
+	cursor = cursor+4
+
+end
+
 
 --
 -- Setting it to
@@ -494,15 +513,15 @@ end
 -- GRIDSTREAM DISSECTOR - STARTS from the FRAME TYPE
 --
 -- ----------------------------------------------------------------------------
-
 local type_field = Field.new("gridstream.type")
 
 local gs_type_to_dissector_map = {
 	[0xD2] = gs_type_d2_dissector,
 	[0xD5] = gs_type_forward_dissector,
-	[0x55] = gs_type_broadcast_dissector
+	[0x55] = gs_type_broadcast_dissector,
+	[0x81] = gs_type_8185_dissector,
+	[0x85] = gs_type_8185_dissector
 }
-
 
 -- ----------------------------------------------------------------------------
 -- Dissector

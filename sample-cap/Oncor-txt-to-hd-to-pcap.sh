@@ -6,9 +6,10 @@ hdfile="${basefile}.hd"
 pcapfile="${basefile}.pcap"
 
 ### This used to remove CRC BAD, but they seem to include other examples...
-# | grep -v "^\[CRC:BAD\]" \
+### - reversed, too many problems with rows marked BAD CRCs...
 echo "Creating HD file..."
 cat ${srcfile} \
+    | grep -v "^\[CRC:BAD\]" \
 	| sed -E 's/\[CRC:...\]\s*//' \
 	| sed -E 's/\w*Baudrate.*$//' \
 	| sed 's/\(\w\w\)/ \1/g' \
