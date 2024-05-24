@@ -191,6 +191,9 @@ end
 -- ----------------------------------------------------------------------------
 local function gs_subtype_c0_dissector(buffer, pinfo, subtree, start)
 	local cursor = start
+	-- start the payload dump here
+	local payloadstart = cursor	
+	
 	
 	subtree:add(pf_dest_device_id1,   buffer(cursor,4))
 	cursor=cursor+4
@@ -201,13 +204,14 @@ local function gs_subtype_c0_dissector(buffer, pinfo, subtree, start)
 	subtree:add(pf_pkt_count,   buffer(cursor,1))
 	cursor = cursor+1
 
-	-- unk
-	subtree:add(pf_unk2,	buffer(cursor,4))
+	-- unknown, looks like a source device ID?
+	subtree:add(pf_src_device_id2,	buffer(cursor,4))
 	cursor = cursor+4
 
 	-- always 32bit FF:FF:FF:FF
 	subtree:add(pf_dest_device_id2, buffer(cursor,4))
 	cursor = cursor+4
+
 
 	-- maybe a flag bit? always 0 / 1
 	subtree:add(pf_subflag, buffer(cursor,1))
@@ -227,21 +231,28 @@ local function gs_subtype_c0_dissector(buffer, pinfo, subtree, start)
 	subtree:add(pf_unk4, buffer(cursor,4))
 	cursor = cursor + 4
 
-	subtree:add(pf_unk5, buffer(cursor,2))
+	-- Is this a counter/time difference?
+	subtree:add(pf_unk5, buffer(cursor,2)):append_text(" ## time difference?")
 	cursor = cursor + 2
 	
 	-- Flag/indicator?  Toggles between 2 values.
 	subtree:add(pf_unk6, buffer(cursor,1))
 	cursor = cursor + 1
 	
-	-- Unknown, appears to count up ONLY when the whole set changes 
-	subtree:add(pf_unk7, buffer(cursor,4))
+	-- Unknown, 
+	-- for a single device, it is always increasing 
+	-- appears to count up ONLY when the whole set changes 
+	local unk_count_str = string.format(" ## %d increasing)",buffer(cursor,4):uint())
+	subtree:add(pf_unk7, buffer(cursor,4)):append_text(unk_count_str)
 	cursor = cursor + 4
-		
+	
+	
+	payloadstart = cursor
+
 	-- rest as raw payload body
 	-- most then start with 0xc1 0x80 0x00 0x00
 	-- util_remainder_as_payload(buffer,subtree,cursor)
-	gs_payload_with_crc_dissector(buffer,subtree,start+9)
+	gs_payload_with_crc_dissector(buffer,subtree,payloadstart)
 
 
 end

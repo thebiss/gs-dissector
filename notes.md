@@ -7,6 +7,8 @@
     - ANSI C12.22 for communication of tables over network
     - IEC 61968 
 
+
+
 # Useful Commands
 ### find patterns in hexdump, then pass through color
 `grep --color=always "50 CF 55 D9 E6 80" Oncor_Capture_01-07-2023_30hrs.txt.hd | sort | less -R`
@@ -26,8 +28,21 @@
 
 - Energy / time (e.g this hour, today): kWh
 
+# Interesting Items
+
+## Forwards (0xd5) subtype 0xc0 contains counters...
+Oncor good data, filter wireshark to:
+`(((gridstream.type == 0xd5) && (gridstream.mesg.src_device_id == f0:b4:4c:a3)) && (gridstream.mesg.type == 0xc0)) && (gridstream.mesg.src_device_id2 == fd:8b:1f:8d)`
+
+## Packet 87331
+- payload contains large block of nulls
+
+## Packet 296316
+- repeating pattern of `07 fe`  in the payload, 27 byte spread?
+
 
 # Open Items
+
 
 ## Report Uptime and Unknown (0x30)
 ### there are round decimal numbers lurking in the payload...
