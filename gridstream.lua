@@ -155,12 +155,29 @@ local function util_add_unknown(field,buffer,subtree,start,len)
 end
 
 
+-- ----------------------------------------------------------------------------
+-- Convert an elapsed time, counting whole teths of seconds, to a readible string
+--
+-- ----------------------------------------------------------------------------
+local function util_elapsedtime_tostring(uptimeInDeciSeconds)
+	-- Parse the uptime
+	local part_tenths	= uptimeInDeciSeconds % 10	-- tenths
+	local rest 			= uptimeInDeciSeconds / 10 -- whole seconds
+	local part_sec 		= rest % 60 -- residual seconds
+
+	rest 				= rest / 60 -- whole minutes
+	local part_mins 	= rest % 60 -- residual minutes
+	local part_hrs 		= rest / 60	-- whole hours 
+
+	local timestr 		= string.format("%d:%.2d:%.2d.%d",part_hrs,part_mins,part_sec,part_tenths)
+	return timestr
+end
+
 -- ==================================================================================
 --
 -- DISSECTORS
 --
 -- ==================================================================================
-
 
 
 -- ----------------------------------------------------------------------------
@@ -180,7 +197,7 @@ local function gs_payload_with_crc_dissector(buffer,subtree,start)
 	payloadtree:add(pf_payload_raw,		buffer(start,payloadLen))
 
 	-- footer fields
-	payloadtree:add(pf_timing,		buffer(start+payloadLen,2)):append_text(" / max 16796?")
+	payloadtree:add(pf_timing,		buffer(start+payloadLen,2)):append_text(" / max 16798?")
 	-- subtree:add(pf_unk3,		buffer(start+payloadLen+2,2))
 	util_add_unknown(pf_footerval, buffer, payloadtree, start+payloadLen+2,2)
 	payloadtree:add(pf_checksum,	buffer(start+payloadLen+4,2))
@@ -281,23 +298,6 @@ local function gs_subtype_c0_dissector(buffer, pinfo, subtree, start)
 
 end
 
--- ----------------------------------------------------------------------------
--- Convert an elapsed time, counting whole teths of seconds, to a readible string
---#region
--- ----------------------------------------------------------------------------
-local function util_elapsedtime_tostring(uptimeInDeciSeconds)
-	-- Parse the uptime
-	local part_tenths	= uptimeInDeciSeconds % 10	-- tenths
-	local rest 			= uptimeInDeciSeconds / 10 -- whole seconds
-	local part_sec 		= rest % 60 -- residual seconds
-
-	rest 				= rest / 60 -- whole minutes
-	local part_mins 	= rest % 60 -- residual minutes
-	local part_hrs 		= rest / 60	-- whole hours 
-
-	local timestr 		= string.format("%d:%.2d:%.2d.%d",part_hrs,part_mins,part_sec,part_tenths)
-	return timestr
-end
 
 -- ----------------------------------------------------------------------------
 -- DISSECT body of Epoch Uptime packages
@@ -398,9 +398,12 @@ local gs_subtype_dissector_map = {
 
 
 -- ----------------------------------------------------------------------------
--- DISSECTOR - Info broadcasts
+-- DISSECTOR - General Info packets
+-- 
+-- 24May - "Broadcast" and "Forward" types are really the same top structure, 
+--         merging dissectors.
 -- ----------------------------------------------------------------------------
-local function gs_type_broadcast_dissector(buffer, pinfo, tree, start)
+local function gs_type_general_dissector(buffer, pinfo, tree, start)
 	local length = buffer:len()
 	if (length-start) <= 0 then return end
 
@@ -430,41 +433,6 @@ local function gs_type_broadcast_dissector(buffer, pinfo, tree, start)
 	end
 end
 
--- ----------------------------------------------------------------------------
--- DISSECTOR for "FOWARDED" packets with the header type of 0xD5
---
--- Decodes a few fields, then looks up the subtype of the packet from the table
--- above, and calls that dissector.
---
--- ----------------------------------------------------------------------------
-
-local function gs_type_forward_dissector(buffer, pinfo, tree, start)
-	local length = buffer:len()
-	if (length-start) <= 0 then return end
-
-	pinfo.cols.protocol = "gridstream.mesg"
-	local subtree = tree:add(gs_proto_info,buffer)
-
-	-- Unknown
-	subtree:add(pf_unk1, 			buffer(start,1))
-
-	-- Length field
-	-- In the sample data, lengths don't roll-over into the unk field above.
-	subtree:add(pf_info_length,		buffer(start+1,1))
-
-	-- maybe a subtype
-    local subsubtree  = subtree:add(pf_subtype,    	buffer(start+2,1))
-	local subtype_val = buffer(start+2,1):uint()
-
-	local fwdsubtype_dissector 	= gs_subtype_dissector_map[subtype_val]
-
-	-- exit if no match
-	if fwdsubtype_dissector ~= nil then
-		fwdsubtype_dissector(buffer, pinfo, subsubtree, start+3)
-	end
-
-end
-
 
 -- ----------------------------------------------------------------------------
 -- Dissector for device header d2
@@ -484,19 +452,15 @@ local function gs_type_d2_dissector(buffer, pinfo, tree, start)
 	local payloadStart = cursor
 
 	-- Guesses to help decode this
-	-- subtree:add(pf_unk1,	buffer(cursor,1))
 	util_add_unknown(pf_unk1, buffer, subtree, cursor, 1)	
 	cursor = cursor+1
 
-	-- subtree:add(pf_unk2,	buffer(cursor,1))
-	util_add_unknown(pf_unk2, buffer, subtree, cursor, 1)	
+	util_add_unknown(pf_unk2, buffer, subtree, cursor, 1):append_text(" length?")
 	cursor = cursor+1
 
-	-- subtree:add(pf_unk3,	buffer(cursor,1))
 	util_add_unknown(pf_unk3, buffer, subtree, cursor, 1)
 	cursor = cursor+1
 
-	-- subtree:add(pf_unk4,	buffer(cursor,2))
 	util_add_unknown(pf_unk4, buffer, subtree, cursor, 2)
 	cursor = cursor+2
 	
@@ -504,7 +468,6 @@ local function gs_type_d2_dissector(buffer, pinfo, tree, start)
 		return 
 	end
 	
-	-- subtree:add(pf_unk5,	buffer(cursor,2))
 	util_add_unknown(pf_unk5, buffer, subtree, cursor, 2)
 	cursor = cursor+2
 
@@ -537,37 +500,43 @@ local function gs_type_8185_dissector(buffer, pinfo, tree, start)
 	subtree:add(pf_dest_device_id1,	buffer(cursor,4))
 	cursor = cursor+4
 
-
 	subtree:add(pf_src_wan_mac,	buffer(cursor,6))
 	cursor = cursor+6
 
 	subtree:add(pf_src_device_id1,	buffer(cursor,4))
 	cursor = cursor+4
-
-
-
 end
-
 
 --
 -- Setting it to
 -- https://seclists.org/wireshark/2021/Aug/53
 --
 
-
 -- ----------------------------------------------------------------------------
 --
 -- GRIDSTREAM DISSECTOR - STARTS from the FRAME TYPE
 --
 -- ----------------------------------------------------------------------------
-local type_field = Field.new("gridstream.type")
-
 local gs_type_to_dissector_map = {
 	[0xD2] = gs_type_d2_dissector,
-	[0xD5] = gs_type_forward_dissector,
-	[0x55] = gs_type_broadcast_dissector,
+	-- [0xD5] = gs_type_forward_dissector,
+	[0xD5] = gs_type_general_dissector,	-- common?
+	[0x55] = gs_type_general_dissector,
 	[0x81] = gs_type_8185_dissector,
-	[0x85] = gs_type_8185_dissector
+	[0x85] = gs_type_8185_dissector,
+
+	-- other types in the Austin file - do these work too?
+	[0x15] = gs_type_general_dissector,
+	[0x45] = gs_type_general_dissector,
+	[0x51] = gs_type_general_dissector,		
+	[0x54] = gs_type_general_dissector,	
+	[0x5D] = gs_type_general_dissector,
+	[0x75] = gs_type_general_dissector,	
+	[0x95] = gs_type_general_dissector,
+	[0xC5] = gs_type_general_dissector,
+	[0xd7] = gs_type_general_dissector,		
+	[0xdf] = gs_type_general_dissector,
+	[0xf5] = gs_type_general_dissector
 }
 
 -- ----------------------------------------------------------------------------
@@ -589,10 +558,8 @@ function gs_proto.dissector(buffer,pinfo,tree)
     subtree:add(pf_flags,	    buffer(2,1))
     subtree:add(pf_type,	    buffer(3,1))
 
-	-- local type_field_val = type_field()()
-
 	-- Lookup the dissector for the subtype
-	local type_field_val = type_field()()
+	local type_field_val = buffer(3,1):uint()
 	local type_specific_dissector = gs_type_to_dissector_map[type_field_val]
 
 	-- exit if no match
