@@ -38,7 +38,47 @@ Oncor good data, filter wireshark to:
 - payload contains large block of nulls
 
 ## Packet 296316
-- repeating pattern of `07 fe`  in the payload, 27 byte spread?
+- repeating pattern of `07 fe` and `7f e0` and `ff c1` and `ff 82`  in the payload, 27 byte spread?
+- truncated dump of the field, with breaks and tabs added
+```
+# header
+00 ff 2a d5 00 fd c0 ff ff ff ff f0 b4 4c a3 20
+fd 8b 1f 8d ff ff ff ff 00 08 ff ff ff ff ff ff
+fe fe fe 7f 00 3c 01 02 32 0a c9 
+
+# payload - spaced to show patterns
+c1 80 00 00     00 02 03 00 
+
+00 5d 48 83     ff 05 fc 1f f8 2c c0 ff c1 7e 
+07 fe 0d 58     3f f0 60 c1 
+
+ff 83 94 0f     fc 12 90
+7f e0 e9 83     ff 04 f0 1f f8 2f 20 ff c1 e2 
+07 fe 08 e8     3f f0 5d 81 
+
+ff 82 76 0f     fc 15 60 
+7f e0 a7 03     ff 04 78 1f f8 3b 60 ff c1 0a 
+07 fe 0b 60     3f f0 79 01 
+
+ff 82 ba 0f     fc 16 e0 
+7f e0 f7 83     ff 06 98 1f f8 35 00 ff c1 a4 
+07 fe 09 b8     3f f0 62 c1
+
+ff 82 64 0f     fc 14 30 
+7f e0 ac 83     ff 06 dc 1f f8 31 80 ff c1 64 
+07 fe 0e 90     3f f0 78 01 
+
+ff 83 68 0f     fc 1f a0 
+7f e0 83 83     ff 04 94 1f f8 35 e0 ff c1 8e 
+07 fe 0f 48     3f f0 46 01 
+
+ff 83 aa 0f     fc 18 80 
+7f e0 b7 bf     ba 05 c8 1f f8 24 80 ff c1 f1 
+07 fe 0e 38     3f f0 54 41 
+
+ff 82 46 0f     fc 17 
+2b 5e 7e 40     b9 6b                                          
+```
 
 
 # Open Items
