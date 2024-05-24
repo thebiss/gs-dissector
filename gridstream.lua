@@ -67,6 +67,8 @@ local pf_uptime_str				= ProtoField.new("uptime (hh:mm:ss)",		"gridstream.mesg.u
 local pf_payload_raw    		= ProtoField.new("payload raw",  			"gridstream.mesg.payload",			ftypes.BYTES,	nil, base.SPACE)
 local pf_payload_len			= ProtoField.new("payload len",	 			"gridstream.mesg.payload_len",		ftypes.UINT16,	nil, base.DEC)
 local pf_timing					= ProtoField.new("timing? (0.01s)",			"gridstream.mesg.timing",			ftypes.UINT16,	nil, base.DEC)
+local pf_footerval				= ProtoField.new("unknown",					"gridstream.mesg.footer",			ftypes.UINT16,	nil, base.DEC)
+local pf_checksum				= ProtoField.new("checksum",				"gridstream.mesg.checksum",			ftypes.UINT16,	nil, base.HEX)
 
 local pf_unk1       			= ProtoField.new("flags?",					"gridstream.mesg.unk1",				ftypes.BYTES, 	nil, base.SPACE)
 local pf_unk2       			= ProtoField.new("unknown",					"gridstream.mesg.unk2",				ftypes.BYTES, 	nil, base.SPACE)
@@ -82,7 +84,7 @@ local pf_dest_device_id2		= ProtoField.new("dest device ID2",		"gridstream.mesg.
 local pf_src_wan_mac 			= ProtoField.new("src device wan mac",	"gridstream.mesg.src_device_wan_mac",	ftypes.BYTES,	nil, base.COLON)
 local pf_src_device_id2    		= ProtoField.new("src device ID2", 		"gridstream.mesg.src_device_id2",		ftypes.BYTES,	nil, base.COLON)
 
-local pf_checksum				= ProtoField.new("checksum",			"gridstream.mesg.checksum",				ftypes.UINT16,	nil, base.HEX)
+
 
 local pf_subflag				= ProtoField.new("subtype flags?",		"gridstream.mesg.subtype_flags",		ftypes.BYTES,	nil, base.SPACE)
 
@@ -97,10 +99,13 @@ gs_proto_info.fields ={
 	pf_epoc_ts,
 	pf_uptime,
 	pf_uptime_str,
-	pf_payload_raw,
+
 	pf_payload_len,
+	pf_payload_raw,
 	pf_timing,
-	
+	pf_footerval,
+	pf_checksum,
+
 	pf_unk1,
 	pf_unk2,
 	pf_unk3,
@@ -109,8 +114,6 @@ gs_proto_info.fields ={
 	pf_unk6,
 	pf_unk7,
 	pf_subflag,
-	
-	pf_checksum,
 	
 	pf_src_wan_mac,
 	pf_src_device_id2,
@@ -121,10 +124,9 @@ gs_proto_info.fields ={
 
 -- ==================================================================================
 --
--- DISSECTORS
+-- UTILITIES
 --
 -- ==================================================================================
-
 
 -- ----------------------------------------------------------------------------
 -- Utility function - puts the rest of the buffer into raw payload
@@ -133,11 +135,32 @@ gs_proto_info.fields ={
 local function util_remainder_as_payload(buffer,subtree,start)
 	local cursor = start
 	local payloadLen 	= buffer:len() - cursor
-	if (payloadLen) <= 0 then return end
+	if (payloadLen) < 0 then return end
 
 	subtree:add(pf_payload_len,		payloadLen):set_generated()
 	subtree:add(pf_payload_raw,		buffer(cursor,payloadLen))
 end
+
+
+-- ----------------------------------------------------------------------------
+-- helper to show unknowns in multiple formats
+-- ----------------------------------------------------------------------------
+local function util_add_unknown(field,buffer,subtree,start,len)
+
+	local val = buffer(start,len):uint()
+	local str = string.format(" / 0x%.2x = %d dec",val,val)
+
+	subtree:add(field, buffer(start,len)):append_text(str)
+	return subtree
+end
+
+
+-- ==================================================================================
+--
+-- DISSECTORS
+--
+-- ==================================================================================
+
 
 
 -- ----------------------------------------------------------------------------
@@ -150,15 +173,16 @@ local function gs_payload_with_crc_dissector(buffer,subtree,start)
 	local payloadFooter = 6
 	local payloadLen 	= buffer:len() - start - payloadFooter
 
-	if (payloadLen) <= 0 then return end
+	if (payloadLen) < 0 then return end
 
 	-- payload body
 	subtree:add(pf_payload_len,		payloadLen):set_generated()
 	local payloadtree = subtree:add(pf_payload_raw,		buffer(start,payloadLen))
 
 	-- footer fields
-	subtree:add(pf_timing,		buffer(start+payloadLen,2))
-	subtree:add(pf_unk3,		buffer(start+payloadLen+2,2))
+	subtree:add(pf_timing,		buffer(start+payloadLen,2)):append_text(" / max 16796?")
+	-- subtree:add(pf_unk3,		buffer(start+payloadLen+2,2))
+	util_add_unknown(pf_footerval, buffer, subtree, start+payloadLen+2,2)
 	subtree:add(pf_checksum,	buffer(start+payloadLen+4,2))
 
 	return start,payloadtree
@@ -336,32 +360,23 @@ local function gs_subtype_30_dissector(buffer, pinfo, subtree, start)
 	-- For the 0x30 type, For a specific source  device, 
 	-- this counts up continuously across the ONCOR sample set.
 	local raw_uptime = buffer(cursor,4):uint()
-	subtree:add(pf_uptime, raw_uptime)
+	subtree:add(pf_uptime, buffer(cursor,4))
 	cursor = cursor + 4
 
 	-- reformat the time as a string
 	local uptime_str = util_elapsedtime_tostring(raw_uptime)
 	subtree:add(pf_uptime_str,			uptime_str):set_generated()	
 
-
-	subtree:add(pf_unk3, buffer(cursor,2))
+	-- unknown
+	util_add_unknown(pf_unk3, buffer, subtree, cursor, 2)
 	cursor = cursor + 2
 
 	-- maybe a device ID?
 	subtree:add(pf_src_device_id2, buffer(cursor,4))
 	cursor = cursor + 4	
 
-	-- Is there something in the tail of the payload, on messages of a certain length?
-	-- filteringon a device ID, like && (gridstream.mesg.src_device_id2 == f1:4c:75:61)
-	-- Value counts up, none higher than 16796
-	if(length == 41) then
-		subtree:add(pf_unk5, buffer(length-1-5,2)):append_text(" accumulates to 16796?")
-		subtree:add(pf_unk6, buffer(length-4,2)):append_text(" ?")
-	end
 
-
-	-- rest is unknown, dump into the raw payload
-	-- Rest as raw payload
+	-- rest is unknown, dump into payload
 	-- 24 May - Appears to have same time/unk/crc footer
 	gs_payload_with_crc_dissector(buffer,subtree,cursor)
 	-- util_remainder_as_payload(buffer,subtree,cursor)
@@ -469,19 +484,28 @@ local function gs_type_d2_dissector(buffer, pinfo, tree, start)
 	local payloadStart = cursor
 
 	-- Guesses to help decode this
-	subtree:add(pf_unk1,	buffer(cursor,1))
+	-- subtree:add(pf_unk1,	buffer(cursor,1))
+	util_add_unknown(pf_unk1, buffer, subtree, cursor, 1)	
 	cursor = cursor+1
 
-	subtree:add(pf_unk2,	buffer(cursor,1))
+	-- subtree:add(pf_unk2,	buffer(cursor,1))
+	util_add_unknown(pf_unk2, buffer, subtree, cursor, 1)	
 	cursor = cursor+1
 
-	subtree:add(pf_unk3,	buffer(cursor,1))
+	-- subtree:add(pf_unk3,	buffer(cursor,1))
+	util_add_unknown(pf_unk3, buffer, subtree, cursor, 1)
 	cursor = cursor+1
 
-	subtree:add(pf_unk4,	buffer(cursor,2))
+	-- subtree:add(pf_unk4,	buffer(cursor,2))
+	util_add_unknown(pf_unk4, buffer, subtree, cursor, 2)
 	cursor = cursor+2
-
-	subtree:add(pf_unk5,	buffer(cursor,2))
+	
+	if (length-cursor) < 2 then 
+		return 
+	end
+	
+	-- subtree:add(pf_unk5,	buffer(cursor,2))
+	util_add_unknown(pf_unk5, buffer, subtree, cursor, 2)
 	cursor = cursor+2
 
 	-- Rest as raw payload
