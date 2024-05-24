@@ -166,42 +166,18 @@ end
 
 
 -- ----------------------------------------------------------------------------
--- Dissects packets of 0x29 or 0x21 subtype
+-- Dissects rest of packets of subtype 0x29, 0x22, 0x21 
 -- Assumes these end with the CRC footer.
 --
 -- STUB
 -- ----------------------------------------------------------------------------
-local function gs_subtype_2921_dissector(buffer, pinfo, subtree, start)
+local function gs_subtype_29_22_21_dissector(buffer, pinfo, subtree, start)
 	subtree:add(pf_dest_device_id1,  buffer(start,4))
 	subtree:add(pf_src_device_id1,   buffer(start+4,4))
 	subtree:add(pf_pkt_count,   	buffer(start+8,1))
 
 	gs_payload_with_crc_dissector(buffer,subtree,start+9)
 end
-
-
--- ----------------------------------------------------------------------------
--- Dissects packets of 22 subtype
---
--- STUB
---
--- ----------------------------------------------------------------------------
-local function gs_subtype_22_dissector(buffer, pinfo, subtree, start)
-	local cursor = start
-
-	subtree:add(pf_dest_device_id1,	buffer(cursor,4))
-	cursor=cursor+4
-
-	subtree:add(pf_src_device_id1,   buffer(cursor,4))
-	cursor = cursor+4
-
-	subtree:add(pf_pkt_count,   	buffer(cursor,1)) -- filtering by src device ID, this consistently counts up then wraps.
-	cursor = cursor+1
-
-	util_remainder_as_payload(buffer,subtree,cursor)
-end
-
-
 
 -- ----------------------------------------------------------------------------
 -- Dissects packets of the C0 subtype
@@ -264,7 +240,8 @@ local function gs_subtype_c0_dissector(buffer, pinfo, subtree, start)
 		
 	-- rest as raw payload body
 	-- most then start with 0xc1 0x80 0x00 0x00
-	util_remainder_as_payload(buffer,subtree,cursor)
+	-- util_remainder_as_payload(buffer,subtree,cursor)
+	gs_payload_with_crc_dissector(buffer,subtree,start+9)
 
 
 end
@@ -382,9 +359,9 @@ end
 -- MAP OF SUB-DISSECTORS
 -- ----------------------------------------------------------------------------
 local gs_subtype_dissector_map = {
-	[0x21] = gs_subtype_2921_dissector,
-	[0x22] = gs_subtype_22_dissector,
-	[0x29] = gs_subtype_2921_dissector,
+	[0x21] = gs_subtype_29_22_21_dissector,
+	[0x22] = gs_subtype_29_22_21_dissector,
+	[0x29] = gs_subtype_29_22_21_dissector,
 	[0x30] = gs_subtype_30_dissector,
 	[0x51] = gs_subtype_epoch_uptime_dissector,
 	[0x55] = gs_subtype_epoch_uptime_dissector,
