@@ -213,11 +213,21 @@ end
 -- STUB
 -- ----------------------------------------------------------------------------
 local function gs_subtype_29_22_21_dissector(buffer, pinfo, subtree, start)
-	subtree:add(pf_dest_device_id1,  buffer(start,4))
-	subtree:add(pf_src_device_id1,   buffer(start+4,4))
-	subtree:add(pf_pkt_count,   	buffer(start+8,1))
+	local cursor = start
 
-	gs_payload_with_crc_dissector(buffer,subtree,start+9)
+	subtree:add(pf_dest_device_id1,  buffer(cursor,4))
+	cursor=cursor+4
+
+	subtree:add(pf_src_device_id1,   buffer(cursor,4))
+	cursor=cursor+4
+
+	subtree:add(pf_pkt_count,   	buffer(cursor,1))
+	cursor = cursor + 1
+
+	util_add_unknown(pf_unk3, buffer, subtree, cursor,1)
+	cursor = cursor + 1
+
+	gs_payload_with_crc_dissector(buffer,subtree,cursor)
 end
 
 -- ----------------------------------------------------------------------------
