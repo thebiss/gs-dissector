@@ -246,7 +246,7 @@ local function gs_subtype_c0_dissector(buffer, pinfo, subtree, start)
 	subtree:add(pf_unk7, buffer(cursor,4)):append_text(unk_count_str)
 	cursor = cursor + 4
 	
-	
+
 	payloadstart = cursor
 
 	-- rest as raw payload body
@@ -362,7 +362,9 @@ local function gs_subtype_30_dissector(buffer, pinfo, subtree, start)
 
 	-- rest is unknown, dump into the raw payload
 	-- Rest as raw payload
-	util_remainder_as_payload(buffer,subtree,cursor)
+	-- 24 May - Appears to have same time/unk/crc footer
+	gs_payload_with_crc_dissector(buffer,subtree,cursor)
+	-- util_remainder_as_payload(buffer,subtree,cursor)
 end
 
 
