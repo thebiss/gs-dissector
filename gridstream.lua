@@ -176,14 +176,14 @@ local function gs_payload_with_crc_dissector(buffer,subtree,start)
 	if (payloadLen) < 0 then return end
 
 	-- payload body
-	subtree:add(pf_payload_len,		payloadLen):set_generated()
-	local payloadtree = subtree:add(pf_payload_raw,		buffer(start,payloadLen))
+	local payloadtree = subtree:add(pf_payload_len,		payloadLen):set_generated()
+	payloadtree:add(pf_payload_raw,		buffer(start,payloadLen))
 
 	-- footer fields
-	subtree:add(pf_timing,		buffer(start+payloadLen,2)):append_text(" / max 16796?")
+	payloadtree:add(pf_timing,		buffer(start+payloadLen,2)):append_text(" / max 16796?")
 	-- subtree:add(pf_unk3,		buffer(start+payloadLen+2,2))
-	util_add_unknown(pf_footerval, buffer, subtree, start+payloadLen+2,2)
-	subtree:add(pf_checksum,	buffer(start+payloadLen+4,2))
+	util_add_unknown(pf_footerval, buffer, payloadtree, start+payloadLen+2,2)
+	payloadtree:add(pf_checksum,	buffer(start+payloadLen+4,2))
 
 	return start,payloadtree
 end
@@ -419,14 +419,14 @@ local function gs_type_broadcast_dissector(buffer, pinfo, tree, start)
 	
 	-- maybe a subsubtype?
 	local subtype_val = buffer(cursor,1):uint()
-	subtree:add(pf_subtype, buffer(cursor,1))
+	local subsubtree = subtree:add(pf_subtype, buffer(cursor,1))
 	cursor = cursor + 1
 
 	local subtype_dissector 	= gs_subtype_dissector_map[subtype_val]
 
 	-- exit if no match
 	if subtype_dissector ~= nil then
-		subtype_dissector(buffer, pinfo, subtree, start+3)
+		subtype_dissector(buffer, pinfo, subsubtree, start+3)
 	end
 end
 
