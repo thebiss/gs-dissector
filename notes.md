@@ -47,7 +47,6 @@ fd 8b 1f 8d ff ff ff ff 00 08 ff ff ff ff ff ff
 fe fe fe 7f 00 3c 01 02 32 0a c9 
 
 # payload - spaced to show patterns
-
 c1 
 80 00 00 00     02 03 00 
 00 5d 48 83     ff 05 fc 
@@ -96,6 +95,8 @@ ff 82 46 0f     fc 17
 2b 5e 7e 40     b9 6b                                          
 ```
 
+## Packets for a single device: `f0:2e:65:f2` in austin dataset
+`(( (gridstream.mesg.src_device_id2 == f0:2e:65:f2)) || (gridstream.mesg.src_device_id == f0:2e:65:f2)) || (gridstream.mesg.dest_device_id == f0:2e:65:f2)`
 
 # Open Items
 
@@ -116,7 +117,7 @@ ff 82 46 0f     fc 17
 Payload starts with 0xfefef27f
 
 - Octets 6&7 change for each device/xmit
-- Last 6 OCTETS change change for each device/xmit
+- Last 6 OCTETS change for each device/xmit
 - Middle payload stays the same for some time.
 
 Is this come kind of beacon that is forwarded?
@@ -239,20 +240,6 @@ Filters found...
 ```
 
 
-## Type 0x55 Broadcast
-regex: `00 FF 2A 55 .* F0 F9 61 56`
-
-```hd
-                  vv
-                                                                                       meter ID seen in other packets
-                                                                                       vvvvvvvvvvv
-000000	 00 FF 2A 55 00 23 30 FF FF FF FF FF FF 50 CF 55 D9 E6 80 96 00 0B 62 6A A4 83 F0 F9 61 56 01 00 2B 32 05 15 DB 7E 90 A9 88	
-                        ^^ ^^ ^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^^^^ ^^ ^^^^^
-                        len   broadcast mac?    frequent          |  |09,0a,0b
-                                                EB 19 F6 98       count by 2
-                                                also seen in D5 packages
-```
-
 ## 0x00FF 0x2AD5 broadcast  packet, with a tail that starts similarly to other (00 01 03 24 pattern)
 ```
                         vv length?
@@ -311,7 +298,7 @@ Packets for the meter come with payloads length
 ``` 
 
     
-Type 0x29 seems to have varying some changing slowly
+## Type 0x29 seems to have varying some changing slowly
     slow changing expectations:  
         Temperature should be slow and similar across meters
         Frequency
@@ -380,3 +367,17 @@ d9 e5 e0 	f1 5d 58 a5 	00 01 03 24 	05 07 	09 06 08 01 	05 01 00 00 	00 01 f0 18
 
 ## time notes
 63:bb:db:69
+
+## Type 0x55 Broadcast
+regex: `00 FF 2A 55 .* F0 F9 61 56`
+
+```hd
+                  vv
+                                                                                       meter ID seen in other packets
+                                                                                       vvvvvvvvvvv
+000000	 00 FF 2A 55 00 23 30 FF FF FF FF FF FF 50 CF 55 D9 E6 80 96 00 0B 62 6A A4 83 F0 F9 61 56 01 00 2B 32 05 15 DB 7E 90 A9 88	
+                        ^^ ^^ ^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^^^^ ^^ ^^^^^
+                        len   broadcast mac?    frequent          |  |09,0a,0b
+                                                EB 19 F6 98       count by 2
+                                                also seen in D5 packages
+```
