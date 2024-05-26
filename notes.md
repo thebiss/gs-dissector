@@ -30,6 +30,39 @@
 
 # Interesting Items
 
+## Type Broadcast (0x55) subtype uptime (0x30) 
+- many 6c05 and 3205 in the payload
+- these convert to about 276xx and 128xx
+- could these be voltage, by phase, for a specific service type?
+
+- do some devices not broadcast this, or only broadcast one of the two values?
+- 128v more than 5% over nominal
+
+```bash
+$ python3 binfor.py  0x6c05 0x3205 0x25 0x26 0x27
+(1): 0x6c05
+     = 27653 dec
+     = 00000000 00000000 01101100 00000101  bin
+
+(2): 0x3205
+     = 12805 dec
+     = 00000000 00000000 00110010 00000101  bin
+
+(3): 0x25
+     = 37 dec
+     = 00000000 00000000 00000000 00100101  bin
+
+(4): 0x26
+     = 38 dec
+     = 00000000 00000000 00000000 00100110  bin
+
+(5): 0x27
+     = 39 dec
+     = 00000000 00000000 00000000 00100111  bin
+```
+
+
+
 ## Forwards (0xd5) subtype 0xc0 contains counters...
 Oncor good data, filter wireshark to:
 `(((gridstream.type == 0xd5) && (gridstream.mesg.src_device_id == f0:b4:4c:a3)) && (gridstream.mesg.type == 0xc0)) && (gridstream.mesg.src_device_id2 == fd:8b:1f:8d)`
