@@ -66,7 +66,7 @@ local pf_uptime     			= ProtoField.new("uptime (0.1s)",			"gridstream.mesg.upti
 local pf_uptime_str				= ProtoField.new("uptime (hh:mm:ss)",		"gridstream.mesg.uptime_str",		ftypes.STRING)
 local pf_payload_raw    		= ProtoField.new("payload raw",  			"gridstream.mesg.payload",			ftypes.BYTES,	nil, base.SPACE)
 local pf_payload_len			= ProtoField.new("payload len",	 			"gridstream.mesg.payload_len",		ftypes.UINT16,	nil, base.DEC)
-local pf_timing					= ProtoField.new("timing? (0.01s)",			"gridstream.mesg.timing",			ftypes.UINT16,	nil, base.DEC)
+local pf_timer					= ProtoField.new("timer (msec)",			"gridstream.mesg.timer",			ftypes.UINT16,	nil, base.DEC)
 local pf_footerval				= ProtoField.new("unknown",					"gridstream.mesg.footer",			ftypes.UINT16,	nil, base.DEC)
 local pf_checksum				= ProtoField.new("checksum",				"gridstream.mesg.checksum",			ftypes.UINT16,	nil, base.HEX)
 
@@ -78,10 +78,12 @@ local pf_unk5					= ProtoField.new("unknown",					"gridstream.mesg.unk5",				fty
 local pf_unk6					= ProtoField.new("unknown",					"gridstream.mesg.unk6",				ftypes.BYTES,	nil, base.SPACE)
 local pf_unk7					= ProtoField.new("unknown",					"gridstream.mesg.unk7",				ftypes.BYTES,	nil, base.SPACE)
 
-local pf_dest_wan_mac 			= ProtoField.new("dest device wan mac",	"gridstream.mesg.dest_device_wan_mac",	ftypes.BYTES,	nil, base.COLON)
+-- local pf_dest_wan_mac 			= ProtoField.new("dest device wan mac",	"gridstream.mesg.dest_device_wan_mac",	ftypes.BYTES,	nil, base.COLON)
+local pf_dest_wan_mac 			= ProtoField.new("dest device wan mac",	"gridstream.mesg.dest_device_wan_mac",	ftypes.ETHER)
 local pf_dest_device_id2		= ProtoField.new("dest device ID2",		"gridstream.mesg.dest_device_id2",		ftypes.BYTES,	nil, base.COLON)
 
-local pf_src_wan_mac 			= ProtoField.new("src device wan mac",	"gridstream.mesg.src_device_wan_mac",	ftypes.BYTES,	nil, base.COLON)
+-- local pf_src_wan_mac 			= ProtoField.new("src device wan mac",	"gridstream.mesg.src_device_wan_mac",	ftypes.BYTES,	nil, base.COLON)
+local pf_src_wan_mac 			= ProtoField.new("src device wan mac",	"gridstream.mesg.src_device_wan_mac",	ftypes.ETHER)
 local pf_src_device_id2    		= ProtoField.new("src device ID2", 		"gridstream.mesg.src_device_id2",		ftypes.BYTES,	nil, base.COLON)
 
 
@@ -102,7 +104,7 @@ gs_proto_info.fields ={
 
 	pf_payload_len,
 	pf_payload_raw,
-	pf_timing,
+	pf_timer,
 	pf_footerval,
 	pf_checksum,
 
@@ -147,8 +149,8 @@ end
 -- ----------------------------------------------------------------------------
 local _padmap =
 {
-	[1] = "      ",
-	[2] = "   ",
+	[1] = "         ",
+	[2] = "      ",
 	[3] = "",
 	[4] = ""
 }
@@ -231,10 +233,17 @@ local function gs_payload_with_crc_dissector(buffer,subtree,start)
 	local payloadtree = subtree:add(pf_payload_len,		payloadLen):set_generated()
 	payloadtree:add(pf_payload_raw,		buffer(start,payloadLen))
 
-	-- footer fields
-	payloadtree:add(pf_timing,		buffer(start+payloadLen,2)):append_text(" / max 16798?")
-	-- subtree:add(pf_unk3,		buffer(start+payloadLen+2,2))
+	-- FOOTER FIELDS
+
+	-- Timer?
+	-- max 16.798sec for Oncor dataset...
+	local timerval = buffer(start+payloadLen,2):uint()
+	payloadtree:add(pf_timer,		buffer(start+payloadLen,2)):append_text(string.format(" => %2.3f sec",timerval/1000))
+
+	-- Fixed value
 	util_add_unknown(pf_footerval, buffer, payloadtree, start+payloadLen+2,2)
+
+	-- CRC 
 	payloadtree:add(pf_checksum,	buffer(start+payloadLen+4,2))
 
 	return start,payloadtree
