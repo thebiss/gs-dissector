@@ -72,10 +72,10 @@ local pf_checksum				= ProtoField.new("checksum",				"gridstream.mesg.checksum",
 
 local pf_unk1       			= ProtoField.new("flags?",					"gridstream.mesg.unk1",				ftypes.BYTES, 	nil, base.SPACE)
 local pf_unk2       			= ProtoField.new("unknown",					"gridstream.mesg.unk2",				ftypes.BYTES, 	nil, base.SPACE)
-local pf_unk3					= ProtoField.new("unknown",					"gridstream.mesg.unk3",				ftypes.UINT16,	nil, base.DEC)	-- use for decimalized words
+local pf_unk3					= ProtoField.new("unknown",					"gridstream.mesg.unk3",				ftypes.BYTES,	nil, base.SPACE)
 local pf_unk4					= ProtoField.new("unknown",					"gridstream.mesg.unk4",				ftypes.BYTES,	nil, base.SPACE)
-local pf_unk5					= ProtoField.new("unknown",					"gridstream.mesg.unk5",				ftypes.UINT16,	nil, base.DEC)
-local pf_unk6					= ProtoField.new("unknown",					"gridstream.mesg.unk6",				ftypes.UINT16,	nil, base.DEC)
+local pf_unk5					= ProtoField.new("unknown",					"gridstream.mesg.unk5",				ftypes.BYTES,	nil, base.SPACE)
+local pf_unk6					= ProtoField.new("unknown",					"gridstream.mesg.unk6",				ftypes.BYTES,	nil, base.SPACE)
 local pf_unk7					= ProtoField.new("unknown",					"gridstream.mesg.unk7",				ftypes.BYTES,	nil, base.SPACE)
 
 local pf_dest_wan_mac 			= ProtoField.new("dest device wan mac",	"gridstream.mesg.dest_device_wan_mac",	ftypes.BYTES,	nil, base.COLON)
@@ -145,12 +145,47 @@ end
 -- ----------------------------------------------------------------------------
 -- helper to show unknowns in multiple formats
 -- ----------------------------------------------------------------------------
-local function util_add_unknown(field,buffer,subtree,start,len)
+local _padmap =
+{
+	[1] = "      ",
+	[2] = "   ",
+	[3] = "",
+	[4] = ""
+}
 
-	local val = buffer(start,len):uint()
-	local str = string.format(" / 0x%.2x = %d dec",val,val)
+local function util_add_unknown(field,buffer,subtree,start,len,suffix)
 
+	
+	local u16str = ""
+	local i16str = ""
+	if len <= 2 then
+		u16str = string.format("%6d as u16",buffer(start,len):uint())
+		i16str = string.format("%6d as i16",buffer(start,len):int())
+		-- too small for float
+	end
+	
+	local f3264str = ""
+	if len == 4 then
+		-- too big for decimal
+		local fval=buffer(start,len):float()
+		f3264str = string.format("%f as f32",fval)
+	elseif len==8 then
+		local fval=buffer(start,len):float()
+		f3264str = string.format("%f as f64",fval)
+	end
+
+	local padstr = _padmap[len]
+	if padstr == nil then
+		padstr=""
+	end
+
+	local str = padstr .. " // " .. u16str .. ", " .. i16str .. ", " .. f3264str
+	if suffix ~= nil then
+		str = str .. suffix
+	end
+	
 	subtree:add(field, buffer(start,len)):append_text(str)
+
 	return subtree
 end
 
@@ -279,22 +314,23 @@ local function gs_subtype_c0_dissector(buffer, pinfo, subtree, start)
 	cursor = cursor+6
 
 
-	subtree:add(pf_unk4, buffer(cursor,4))
+	util_add_unknown(pf_unk4, buffer, subtree, cursor, 4)
 	cursor = cursor + 4
 
 	-- Is this a counter/time difference?
-	subtree:add(pf_unk5, buffer(cursor,2)):append_text(" ## time difference?")
+	util_add_unknown(pf_unk5, buffer, subtree, cursor, 2, " ## time difference?")
 	cursor = cursor + 2
 	
 	-- Flag/indicator?  Toggles between 2 values.
-	subtree:add(pf_unk6, buffer(cursor,1))
+	util_add_unknown(pf_unk6, buffer, subtree, cursor, 1, " ## flag?")
 	cursor = cursor + 1
 	
 	-- Unknown, 
 	-- for a single device, it is always increasing 
 	-- appears to count up ONLY when the whole set changes 
-	local unk_count_str = string.format(" ## %d increasing)",buffer(cursor,4):uint())
-	subtree:add(pf_unk7, buffer(cursor,4)):append_text(unk_count_str)
+	-- local unk_count_str = string.format(" ## %d increasing)",buffer(cursor,4):uint())
+	-- subtree:add(pf_unk7, buffer(cursor,4)):append_text(unk_count_str)
+	util_add_unknown(pf_unk7, buffer, subtree, cursor, 4, " ## increasing?")
 	cursor = cursor + 4
 	
 
@@ -465,7 +501,7 @@ local function gs_type_d2_dissector(buffer, pinfo, tree, start)
 	util_add_unknown(pf_unk1, buffer, subtree, cursor, 1)	
 	cursor = cursor+1
 
-	util_add_unknown(pf_unk2, buffer, subtree, cursor, 1):append_text(" length?")
+	util_add_unknown(pf_unk2, buffer, subtree, cursor, 1, " ttl?")
 	cursor = cursor+1
 
 	util_add_unknown(pf_unk3, buffer, subtree, cursor, 1)
