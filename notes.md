@@ -30,6 +30,13 @@
 
 # Interesting Items
 
+
+## Packet count - even only?
+- Suspected packet count always increments by 2 / always even #
+- example: see `((gridstream.mesg.src_device_id2 == f0:b4:4c:a3)) || (gridstream.mesg.src_device_id == f0:b4:4c:a3)`
+
+
+
 ## Type Broadcast (0x55) subtype uptime (0x30) 
 - many 6c05 and 3205 in the payload
 - these convert to about 276xx and 128xx
@@ -90,38 +97,49 @@ c1
 c1 
 ff 83 94 0f     fc 12 90
 7f e0 e9 83     ff 04 f0 
+
 1f f8 2f 20     ff c1 e2 
 07 fe 08 e8     3f f0 5d 
+
 
 81 
 ff 82 76 0f     fc 15 60 
 7f e0 a7 03     ff 04 78 
+
 1f f8 3b 60     ff c1 0a 
 07 fe 0b 60     3f f0 79 
+
 
 01 
 ff 82 ba 0f     fc 16 e0 
 7f e0 f7 83     ff 06 98 
+
 1f f8 35 00     ff c1 a4 
 07 fe 09 b8     3f f0 62 
+
 
 c1
 ff 82 64 0f     fc 14 30 
 7f e0 ac 83     ff 06 dc 
+
 1f f8 31 80     ff c1 64 
 07 fe 0e 90     3f f0 78 
 
 01 
 ff 83 68 0f     fc 1f a0 
 7f e0 83 83     ff 04 94
+
 1f f8 35 e0     ff c1 8e 
 07 fe 0f 48     3f f0 46 
+
 
 01 
 ff 83 aa 0f     fc 18 80 
 7f e0 b7 bf     ba 05 c8 
+
 1f f8 24 80     ff c1 f1 
 07 fe 0e 38     3f f0 54 
+
 
 41 
 ff 82 46 0f     fc 17 
@@ -129,6 +147,7 @@ ff 82 46 0f     fc 17
 ```
 
 ## Packets for a single device: `f0:2e:65:f2` in austin dataset
+
 `(( (gridstream.mesg.src_device_id2 == f0:2e:65:f2)) || (gridstream.mesg.src_device_id == f0:2e:65:f2)) || (gridstream.mesg.dest_device_id == f0:2e:65:f2)`
 
 # Open Items
